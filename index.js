@@ -29,6 +29,7 @@ const run = async () => {
 
     const bidDokanDb = client.db("bidDokanDb");
     const bidCollection = bidDokanDb.collection("bidCollection");
+    const bids = bidDokanDb.collection("bids");
 
     // ! Post
     app.post("/products", async (req, res) => {
@@ -56,13 +57,22 @@ const run = async () => {
 
     // ! get
     app.get("/products", async (req, res) => {
-      const projectDetails = { title: 1, price_min: 1, image: 1, price_max: 1 };
-      const myCollection = bidCollection
-        .find()
-        .sort({ price_min: 1 })
-        .skip(3)
-        .limit(3)
-        .project(projectDetails);
+      // const projectDetails = { title: 1, price_min: 1, image: 1, price_max: 1 };
+      // const myCollection = bidCollection
+      //   .find()
+      //   .sort({ price_min: 1 })
+      //   .skip(3)
+      //   .limit(3)
+      //   .project(projectDetails);
+      // const result = await myCollection.toArray();
+      // console.log(req.query);
+
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.email = email;
+      }
+      const myCollection = bidCollection.find(query);
       const result = await myCollection.toArray();
       res.send(result);
     });
@@ -83,8 +93,50 @@ const run = async () => {
       res.send(result);
     });
 
-    //? route close
+    // !  bids related apis
+    app.get("/bids", async (req, res) => {
+      const email = req.query.email;
+      const queryEmail = {};
+      console.log(email);
 
+      if (email) {
+        queryEmail.buyer_email = email;
+      }
+
+      const allBids = bids.find(queryEmail);
+      const result = await allBids.toArray();
+      res.send(result);
+    });
+
+    // ! bids post apis
+    app.post("/bids", async (req, res) => {
+      const bids = req.body;
+      const result = await bids.insertOne(bids);
+      res.send(result);
+    });
+
+    // !bids delete apis
+    app.delete("/bids/:id", async (req, res) => {
+      const params = req.params.id;
+      const query = { _id: new ObjectId(params) };
+      const result = await bids.deleteOne(query);
+      res.send(result);
+    });
+
+    // ! single get bids  product
+
+    app.get("/bids/:id", async (req, res) => {
+      const params = req.params.id;
+      const query = { _id: new ObjectId(params) };
+      const result = bids.findOne(query);
+      res.send(result);
+    });
+
+    app.get("/", (req, res) => {
+      res.send("Hello world");
+    });
+
+    //? route close
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
@@ -97,9 +149,6 @@ const run = async () => {
 run().catch(console.dir);
 
 //! server path
-app.get("/", (req, res) => {
-  res.send("Hello world");
-});
 
 app.listen(port, () => {
   console.log("server is running port number :", port);
