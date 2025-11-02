@@ -5,7 +5,7 @@ const app = express();
 
 const port = process.env.PORT || 3000;
 
-//  middle ware
+//!  middle ware
 app.use(cors());
 app.use(express.json());
 
@@ -21,6 +21,7 @@ const client = new MongoClient(uri, {
   },
 });
 
+// ! run function
 const run = async () => {
   try {
     await client.connect();
@@ -54,10 +55,23 @@ const run = async () => {
     });
 
     // ! get
-
     app.get("/products", async (req, res) => {
-      const myCollection = bidCollection.find();
+      const projectDetails = { title: 1, price_min: 1, image: 1, price_max: 1 };
+      const myCollection = bidCollection
+        .find()
+        .sort({ price_min: 1 })
+        .skip(3)
+        .limit(3)
+        .project(projectDetails);
       const result = await myCollection.toArray();
+      res.send(result);
+    });
+
+    // ! single get product
+    app.get("/products/:id", async (req, res) => {
+      const params = req.params.id;
+      const query = { _id: new ObjectId(params) };
+      const result = await bidCollection.findOne(query);
       res.send(result);
     });
 
