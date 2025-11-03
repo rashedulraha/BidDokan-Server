@@ -28,7 +28,7 @@ const run = async () => {
     //! crete a data base and users data collection
 
     const bidDokanDb = client.db("bidDokanDb");
-    const bidCollection = bidDokanDb.collection("bidCollection");
+    const bidCollection = bidDokanDb.collection("bidCollections");
     const bids = bidDokanDb.collection("bids");
 
     // ! Post
@@ -38,59 +38,29 @@ const run = async () => {
       res.send(result);
     });
 
-    // ! patch
-    app.patch("/products/:id", async (req, res) => {
-      const params = req.params.id;
-      const updateProduct = req.body;
-      const query = { _id: new ObjectId(params) };
-      const update = {
-        $set: {
-          name: updateProduct.name,
-          price: updateProduct.price,
-        },
-      };
-      const option = {};
-      const result = await bidCollection.updateOne(query, update, option);
-
+    //! latest products
+    app.get("/latest-products", async (req, res) => {
+      const findProducts = bidCollection.find();
+      const result = await findProducts.toArray();
       res.send(result);
     });
 
-    // ! get
-    app.get("/products", async (req, res) => {
-      // const projectDetails = { title: 1, price_min: 1, image: 1, price_max: 1 };
-      // const myCollection = bidCollection
-      //   .find()
-      //   .sort({ price_min: 1 })
-      //   .skip(3)
-      //   .limit(3)
-      //   .project(projectDetails);
-      // const result = await myCollection.toArray();
-      // console.log(req.query);
-
-      const email = req.query.email;
-      const query = {};
-      if (email) {
-        query.email = email;
-      }
-      const myCollection = bidCollection.find(query);
-      const result = await myCollection.toArray();
-      res.send(result);
-    });
-
-    // ! single get product
+    //!  get products find single id
     app.get("/products/:id", async (req, res) => {
-      const params = req.params.id;
-      const query = { _id: new ObjectId(params) };
-      const result = await bidCollection.findOne(query);
-      res.send(result);
-    });
+      try {
+        const paramsID = req.params.id;
+        const query = { _id: new ObjectId(paramsID) };
+        const result = await bidCollection.findOne(query);
 
-    // ! Delete
-    app.delete("/products/:id", async (req, res) => {
-      const params = req.params.id;
-      const query = { _id: new ObjectId(params) };
-      const result = await bidCollection.deleteOne(query);
-      res.send(result);
+        if (!result) {
+          return res.status(404).send({ message: "Product not found" });
+        }
+
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Server error" });
+      }
     });
 
     // !  bids related apis
@@ -122,25 +92,6 @@ const run = async () => {
       const result = await bids.deleteOne(query);
       res.send(result);
     });
-
-    // ! single get bids  product
-
-    app.get("/bids/:id", async (req, res) => {
-      const params = req.params.id;
-      const query = { _id: new ObjectId(params) };
-      const result = bids.findOne(query);
-      res.send(result);
-    });
-
-    app.get("/", (req, res) => {
-      res.send("Hello world");
-    });
-
-    //? route close
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
   } finally {
     // await client.close();
   }
