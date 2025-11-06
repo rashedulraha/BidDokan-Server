@@ -1,18 +1,28 @@
+// ---------------------------
+//  Import Dependencies
+// ---------------------------
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
-const app = express();
 
+// ---------------------------
+//  App Configuration
+// ---------------------------
+const app = express();
 const port = process.env.PORT || 3000;
 
-//!  middle ware
+// ---------------------------
+//  Middleware
+// ---------------------------
 app.use(cors());
 app.use(express.json());
 
+// ---------------------------
+// 🌐 MongoDB Connection
+// ---------------------------
 const uri =
   "mongodb+srv://BidDokanDB:ajGXtiNnb0zsRJ2m@simpleproject.deo4wzy.mongodb.net/?appName=SimpleProject";
 
-//! connect mongoDb client
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -21,86 +31,161 @@ const client = new MongoClient(uri, {
   },
 });
 
-// ! run function
-const run = async () => {
+// ---------------------------
+//  Run Main Function
+// ---------------------------
+async function run() {
   try {
     await client.connect();
-    //! crete a data base and users data collection
 
-    const bidDokanDb = client.db("bidDokanDb");
-    const bidCollection = bidDokanDb.collection("bidCollections");
-    const bids = bidDokanDb.collection("bids");
+    // console.log(" MongoDB Connected Successfully");
 
-    // ! Post
+    // Database & Collections
+    const db = client.db("bidDokanDb");
+    const productsCollection = db.collection("bidCollections");
+    const bidsCollection = db.collection("bids");
+    const createProductsCols = db.collection("create-products");
+
+    // ---------------------------
+    //  PRODUCT APIs
+    // ---------------------------
+
+    //  Add a new product
     app.post("/products", async (req, res) => {
-      const newProduct = req.body;
-      const result = await bidCollection.insertOne(newProduct);
-      res.send(result);
+      try {
+        const newProduct = req.body;
+        const result = await productsCollection.insertOne(newProduct);
+        res.status(201).send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to add product" });
+      }
     });
 
-    //! latest products
+    //  Get all products
+    app.get("/products", async (req, res) => {
+      try {
+        const products = await productsCollection.find().toArray();
+        res.send(products);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch products" });
+      }
+    });
+
+    //  Get latest 6 products
     app.get("/latest-products", async (req, res) => {
-      const findProducts = bidCollection.find();
-      const result = await findProducts.toArray();
-      res.send(result);
+      try {
+        const latest = await productsCollection
+          .find()
+          .sort({ _id: -1 })
+          .limit(6)
+          .toArray();
+        res.send(latest);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch latest products" });
+      }
     });
 
-    //!  get products find single id
+    //  Get single product by ID
     app.get("/products/:id", async (req, res) => {
       try {
-        const paramsID = req.params.id;
-        const query = { _id: new ObjectId(paramsID) };
-        const result = await bidCollection.findOne(query);
+        const id = req.params.id;
+        const product = await productsCollection.findOne({
+          _id: new ObjectId(id),
+        });
 
-        if (!result) {
+        if (!product) {
           return res.status(404).send({ message: "Product not found" });
         }
 
-        res.send(result);
+        res.send(product);
       } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Server error" });
+        res.status(400).send({ message: "Invalid product ID" });
       }
     });
 
-    // !  bids related apis
+    // ---------------------------
+    //  BID APIs
+    // ---------------------------
+
+    //  Get all bids or by buyer_email
     app.get("/bids", async (req, res) => {
       const email = req.query.email;
-      const queryEmail = {};
-      console.log(email);
-
+      const query = {};
       if (email) {
-        queryEmail.buyer_email = email;
+        query.buyer_email = email;
       }
 
-      const allBids = bids.find(queryEmail);
-      const result = await allBids.toArray();
+      const cursor = bidsCollection.find(query);
+      const result = await cursor.toArray();
       res.send(result);
     });
 
-    // ! bids post apis
+    app.get("/products/bids/:productId", async (req, res) => {
+      const productId = req.params.productId;
+      const query = { product: productId };
+      const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    //  Add a new bid
     app.post("/bids", async (req, res) => {
-      const bids = req.body;
-      const result = await bids.insertOne(bids);
+      try {
+        const newBid = req.body;
+        const result = await bidsCollection.insertOne(newBid);
+        res.status(201).send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to add bid" });
+      }
+    });
+
+    //! create  products api
+    app.post("/create-products", async (req, res) => {
+      console.log("create products clicked");
+      const createProducts = req.body;
+      const result = await createProductsCols.insertOne(createProducts);
       res.send(result);
     });
 
-    // !bids delete apis
+    //!  put api to update product
+    app.put("/update-products/:id", async (req, res) => {
+      const { id } = req.params;
+      const data = req.body;
+      const UpdateId = { _id: new ObjectId(id) };
+      const update = {
+        $set: data,
+      };
+
+      const result = await productsCollection.updateOne(UpdateId, update);
+      res.send(result);
+    });
+
+    //  Delete a bid by ID
     app.delete("/bids/:id", async (req, res) => {
-      const params = req.params.id;
-      const query = { _id: new ObjectId(params) };
-      const result = await bids.deleteOne(query);
-      res.send(result);
+      try {
+        const id = req.params.id;
+        const result = await bidsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "Bid not found" });
+        }
+        res.send(result);
+      } catch (err) {
+        res.status(400).send({ message: "Invalid bid ID" });
+      }
     });
-  } finally {
-    // await client.close();
+  } catch (err) {
+    console.error(" MongoDB Connection Failed:", err);
   }
-};
+}
 
-run().catch(console.dir);
+run().catch(console.error);
 
-//! server path
-
+// ---------------------------
+//  Server Listen
+// ---------------------------
 app.listen(port, () => {
-  console.log("server is running port number :", port);
+  console.log(`Server running on port: ${port}`);
 });
