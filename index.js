@@ -161,20 +161,12 @@ async function run() {
       res.send(result);
     });
 
-    //  Delete a bid by ID
-    app.delete("/bids/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const result = await bidsCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        if (result.deletedCount === 0) {
-          return res.status(404).send({ message: "Bid not found" });
-        }
-        res.send(result);
-      } catch (err) {
-        res.status(400).send({ message: "Invalid bid ID" });
-      }
+    //!  delete product  using delete method
+    app.delete("/delete-product/:id", async (req, res) => {
+      const { id } = req.params;
+      const productId = { _id: new ObjectId(id) };
+      const result = await productsCollection.deleteOne(productId);
+      res.send(result);
     });
   } catch (err) {
     console.error(" MongoDB Connection Failed:", err);
